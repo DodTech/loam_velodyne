@@ -191,6 +191,8 @@ void TransformMaintenance::laserOdometryHandler(const nav_msgs::Odometry::ConstP
   _transformSum[4] = laserOdometry->pose.pose.position.y;
   _transformSum[5] = laserOdometry->pose.pose.position.z;
 
+
+
   transformAssociateToMap();
 
   geoQuat = tf::createQuaternionMsgFromRollPitchYaw
@@ -204,6 +206,19 @@ void TransformMaintenance::laserOdometryHandler(const nav_msgs::Odometry::ConstP
   _laserOdometry2.pose.pose.position.x = _transformMapped[3];
   _laserOdometry2.pose.pose.position.y = _transformMapped[4];
   _laserOdometry2.pose.pose.position.z = _transformMapped[5];
+
+  // ROS_INFO("received _covariance_x %f y %f z %f", laserOdometry->pose.covariance[0], laserOdometry->pose.covariance[1], laserOdometry->pose.covariance[2]);
+
+  // Average the mapping covariance with the odometry covariance... should be somewhere in between. halfway is a reasonable estimate?
+  _laserOdometry2.pose.covariance[0] = (_odomAftMapped_covariance_x + laserOdometry->pose.covariance[0])/2.0;
+  _laserOdometry2.pose.covariance[1] = (_odomAftMapped_covariance_y + laserOdometry->pose.covariance[1])/2.0;
+  _laserOdometry2.pose.covariance[2] = (_odomAftMapped_covariance_z + laserOdometry->pose.covariance[2])/2.0;
+
+
+  // ROS_INFO("mapping x covariance %lf", _odomAftMapped_covariance_x);
+
+  // ROS_INFO("_laserOdometry2 final output x covariance %lf", _laserOdometry2.pose.covariance[0]);
+
   _pubLaserOdometry2.publish(_laserOdometry2);
 
   _laserOdometryTrans2.stamp_ = laserOdometry->header.stamp;
@@ -235,6 +250,14 @@ void TransformMaintenance::odomAftMappedHandler(const nav_msgs::Odometry::ConstP
   _transformBefMapped[3] = odomAftMapped->twist.twist.linear.x;
   _transformBefMapped[4] = odomAftMapped->twist.twist.linear.y;
   _transformBefMapped[5] = odomAftMapped->twist.twist.linear.z;
+
+  _odomAftMapped_covariance_x = odomAftMapped->pose.covariance[0];
+  _odomAftMapped_covariance_y = odomAftMapped->pose.covariance[1];
+  _odomAftMapped_covariance_z = odomAftMapped->pose.covariance[2];
+
+  // ROS_INFO("received mapping x covariance %lf", odomAftMapped->pose.covariance[0]);
+
+
 }
 
 } // end namespace loam

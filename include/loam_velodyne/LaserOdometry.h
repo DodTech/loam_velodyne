@@ -190,6 +190,10 @@ private:
   Twist _transform;     ///< optimized pose transformation
   Twist _transformSum;  ///< accumulated optimized pose transformation
 
+  float _covariance_x;
+  float _covariance_y;
+  float _covariance_z;
+
   Angle _imuRollStart, _imuPitchStart, _imuYawStart;
   Angle _imuRollEnd, _imuPitchEnd, _imuYawEnd;
 

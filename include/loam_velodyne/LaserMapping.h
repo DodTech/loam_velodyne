@@ -212,6 +212,10 @@ private:
   bool _newLaserCloudFullRes;     ///< flag if a new full resolution cloud has been received
   bool _newLaserOdometry;         ///< flag if a new laser odometry has been received
 
+  float _covariance_x;
+  float _covariance_y;
+  float _covariance_z;
+
   Twist _transformSum;
   Twist _transformIncre;
   Twist _transformTobeMapped;

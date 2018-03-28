@@ -477,6 +477,9 @@ void LaserOdometry::process()
 
   size_t lastCornerCloudSize = _lastCornerCloud->points.size();
   size_t lastSurfaceCloudSize = _lastSurfaceCloud->points.size();
+  size_t iterCount = 0;
+  float deltaR = -999;
+  float deltaT = -999;
 
   if (lastCornerCloudSize > 10 && lastSurfaceCloudSize > 100) {
     std::vector<int> pointSearchInd(1);
@@ -493,7 +496,8 @@ void LaserOdometry::process()
     _pointSearchSurfInd2.resize(surfPointsFlatNum);
     _pointSearchSurfInd3.resize(surfPointsFlatNum);
 
-    for (size_t iterCount = 0; iterCount < _maxIterations; iterCount++) {
+
+    for (iterCount = 0; iterCount < _maxIterations; iterCount++) {
       pcl::PointXYZI pointSel, pointProj, tripod1, tripod2, tripod3;
       _laserCloudOri->clear();
       _coeffSel->clear();
@@ -702,6 +706,9 @@ void LaserOdometry::process()
         }
       }
 
+
+
+
       int pointSelNum = _laserCloudOri->points.size();
       if (pointSelNum < 10) {
         continue;
@@ -824,18 +831,33 @@ void LaserOdometry::process()
       if( !pcl_isfinite(_transform.pos.y()) ) _transform.pos.y() = 0.0;
       if( !pcl_isfinite(_transform.pos.z()) ) _transform.pos.z() = 0.0;
 
-      float deltaR = sqrt(pow(rad2deg(matX(0, 0)), 2) +
+      deltaR = sqrt(pow(rad2deg(matX(0, 0)), 2) +
                           pow(rad2deg(matX(1, 0)), 2) +
                           pow(rad2deg(matX(2, 0)), 2));
-      float deltaT = sqrt(pow(matX(3, 0) * 100, 2) +
+      deltaT = sqrt(pow(matX(3, 0) * 100, 2) +
                           pow(matX(4, 0) * 100, 2) +
                           pow(matX(5, 0) * 100, 2));
+
+      _covariance_x = fabs(matX(3, 0) * 100.0);
+      _covariance_y = fabs(matX(4, 0) * 100.0);
+      _covariance_z = fabs(matX(5, 0) * 100.0);
 
       if (deltaR < _deltaRAbort && deltaT < _deltaTAbort) {
         break;
       }
     }
+  } else {
+
+      // Not running the iteration.. increasing covariance 
+      _covariance_x += 0.1;
+      _covariance_y += 0.1;
+      _covariance_z += 0.1;
+
   }
+  // ROS_INFO("odom _covariance_x %f y %f z %f", _covariance_x, _covariance_y, _covariance_z);
+
+  // ROS_INFO("iterations vs max iterations %d vs %d", ((int) iterCount), ((int)_maxIterations));
+
 
   Angle rx, ry, rz;
   accumulateRotation(_transformSum.rot_x,
@@ -896,6 +918,21 @@ void LaserOdometry::publishResult()
   _laserOdometryMsg.pose.pose.position.x = _transformSum.pos.x();
   _laserOdometryMsg.pose.pose.position.y = _transformSum.pos.y();
   _laserOdometryMsg.pose.pose.position.z = _transformSum.pos.z();
+
+
+  _laserOdometryMsg.pose.covariance = {99999, 0, 0, 0, 0, 0, 
+                                      0, 99999, 0, 0, 0, 0,
+                                      0, 0, 99999, 0, 0, 0,
+                                      0, 0, 0, 99999, 0, 0,
+                                      0, 0, 0, 0, 99999, 0,
+                                      0, 0, 0, 0, 0, 99999};
+
+  _laserOdometryMsg.pose.covariance[0] = _covariance_x;
+  _laserOdometryMsg.pose.covariance[1] = _covariance_y;
+  _laserOdometryMsg.pose.covariance[2] = _covariance_z;
+
+  // ROS_INFO("odom publish _covariance_x %f y %f z %f", _laserOdometryMsg.pose.covariance[0], _laserOdometryMsg.pose.covariance[1], _laserOdometryMsg.pose.covariance[2]);
+
   _pubLaserOdometry.publish(_laserOdometryMsg);
 
   _laserOdometryTrans.stamp_ = _timeSurfPointsLessFlat;

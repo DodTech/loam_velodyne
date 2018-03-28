@@ -787,6 +787,9 @@ void LaserMapping::optimizeTransformTobeMapped()
   pcl::PointCloud<pcl::PointXYZI> laserCloudOri;
   pcl::PointCloud<pcl::PointXYZI> coeffSel;
 
+  float deltaR = -999;
+  float deltaT = -999;
+
   for (size_t iterCount = 0; iterCount < _maxIterations; iterCount++) {
     laserCloudOri.clear();
     coeffSel.clear();
@@ -1022,17 +1025,26 @@ void LaserMapping::optimizeTransformTobeMapped()
     _transformTobeMapped.pos.y() += matX(4, 0);
     _transformTobeMapped.pos.z() += matX(5, 0);
 
-    float deltaR = sqrt(pow(rad2deg(matX(0, 0)), 2) +
+    deltaR = sqrt(pow(rad2deg(matX(0, 0)), 2) +
                         pow(rad2deg(matX(1, 0)), 2) +
                         pow(rad2deg(matX(2, 0)), 2));
-    float deltaT = sqrt(pow(matX(3, 0) * 100, 2) +
+    deltaT = sqrt(pow(matX(3, 0) * 100, 2) +
                         pow(matX(4, 0) * 100, 2) +
                         pow(matX(5, 0) * 100, 2));
+
+    _covariance_x = fabs(matX(3, 0) * 100.0);
+    _covariance_y = fabs(matX(4, 0) * 100.0);
+    _covariance_z = fabs(matX(5, 0) * 100.0);
+
 
     if (deltaR < _deltaRAbort && deltaT < _deltaTAbort) {
       break;
     }
   }
+
+  // ROS_INFO("mapping delta r %f and delta t %f", deltaR, deltaT);
+  // ROS_INFO("mapping _covariance_x %f y %f z %f", _covariance_x, _covariance_y, _covariance_z);
+
 
   transformUpdate();
 }
@@ -1089,12 +1101,28 @@ void LaserMapping::publishResult()
   _odomAftMapped.pose.pose.position.x = _transformAftMapped.pos.x();
   _odomAftMapped.pose.pose.position.y = _transformAftMapped.pos.y();
   _odomAftMapped.pose.pose.position.z = _transformAftMapped.pos.z();
+
+  _odomAftMapped.pose.covariance = {99999, 0, 0, 0, 0, 0, 
+                                      0, 99999, 0, 0, 0, 0,
+                                      0, 0, 99999, 0, 0, 0,
+                                      0, 0, 0, 99999, 0, 0,
+                                      0, 0, 0, 0, 99999, 0,
+                                      0, 0, 0, 0, 0, 99999};
+
+  _odomAftMapped.pose.covariance[0] = _covariance_x;
+  _odomAftMapped.pose.covariance[1] = _covariance_y;
+  _odomAftMapped.pose.covariance[2] = _covariance_z;
+
+  // ROS_INFO("before assignment mapping _covariance_x %f y %f z %f", _covariance_x, _covariance_y, _covariance_z);
+  // ROS_INFO("after assignment mapping covariance[0] %f y %f z %f", _odomAftMapped.pose.covariance[0], _odomAftMapped.pose.covariance[1], _odomAftMapped.pose.covariance[2]);
+
   _odomAftMapped.twist.twist.angular.x = _transformBefMapped.rot_x.rad();
   _odomAftMapped.twist.twist.angular.y = _transformBefMapped.rot_y.rad();
   _odomAftMapped.twist.twist.angular.z = _transformBefMapped.rot_z.rad();
   _odomAftMapped.twist.twist.linear.x = _transformBefMapped.pos.x();
   _odomAftMapped.twist.twist.linear.y = _transformBefMapped.pos.y();
   _odomAftMapped.twist.twist.linear.z = _transformBefMapped.pos.z();
+
   _pubOdomAftMapped.publish(_odomAftMapped);
 
   _aftMappedTrans.stamp_ = _timeLaserOdometry;
